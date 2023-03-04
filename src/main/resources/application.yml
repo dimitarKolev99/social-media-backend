@@ -1,0 +1,26 @@
+#spring:
+#  application:
+#    name: app
+#  datasource:
+#    url: jdbc:mysql://localhost:3306/testdb?useSSL=false
+#    username: root
+#    password: root
+#  jpa:
+#    properties:
+#      hibernate:
+#        dialect: org.hibernate.dialect.MySQLDialect
+#        generate-ddl: true
+#        ddl-auto: create-drop
+#        auto_quote_keyword: true
+#        show-sql: false
+#
+#server:
+#  port: 8080
+#  servlet:
+#    context-path: /
+#
+#security:
+#  jwt:
+#    secret-key: secret-key
+#    expire-length: 300000 # 5 minutes duration by default: 5 minutes * 60 seconds * 1000 miliseconds
+#    cookie-name: my-cookie
