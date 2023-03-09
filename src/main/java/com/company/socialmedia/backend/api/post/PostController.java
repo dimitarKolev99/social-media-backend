@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+@CrossOrigin(origins = "http://localhost:9000", maxAge = 3600)
 @RestController
 @RequestMapping("/api")
 public class PostController {

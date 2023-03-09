@@ -5,6 +5,7 @@ import com.company.socialmedia.backend.api.user.UserRepository;
 import com.company.socialmedia.backend.api.user.dto.User;
 import com.company.socialmedia.backend.login.dto.request.LoginRequest;
 import com.company.socialmedia.backend.login.dto.request.SignupRequest;
+import com.company.socialmedia.backend.login.dto.response.JwtResponse;
 import com.company.socialmedia.backend.login.dto.response.MessageResponse;
 import com.company.socialmedia.backend.login.dto.response.UserInfoResponse;
 import com.company.socialmedia.backend.login.refreshtoken.RefreshTokenService;
@@ -61,7 +62,7 @@ public class AuthController {
     RefreshTokenService refreshTokenService;
 
     @PostMapping("/signin")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<JwtResponse> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
         Authentication authentication = authenticationManger
                 .authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(),
                         loginRequest.getPassword()));
@@ -70,7 +71,7 @@ public class AuthController {
 
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-        ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(userDetails);
+        String jwtToken = jwtUtils.generateJwtToken(authentication);
 
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority).toList();
@@ -79,13 +80,15 @@ public class AuthController {
 
         ResponseCookie jwtRefreshCookie = jwtUtils.generateRefreshJwtCookie(refreshToken.getToken());
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
-                .header(HttpHeaders.SET_COOKIE, jwtRefreshCookie.toString())
-                .body(new UserInfoResponse(userDetails.getId(),
-                                            userDetails.getUsername(),
-                                            userDetails.getEmail(),
-                                            roles));
+        return ResponseEntity.ok(
+                    new JwtResponse(
+                            jwtToken,
+                            userDetails.getId(),
+                            userDetails.getUsername(),
+                            userDetails.getEmail(),
+                            roles
+                    )
+                );
     }
 
 
