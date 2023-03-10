@@ -1,6 +1,7 @@
 package com.company.socialmedia.backend.api.user.dto;
 
 
+import com.company.socialmedia.backend.api.files.FileInfo;
 import com.company.socialmedia.backend.login.refreshtoken.RefreshToken;
 import com.company.socialmedia.backend.login.role.Role;
 import com.google.gson.Gson;
@@ -58,6 +59,10 @@ public class User {
 
     @OneToOne(fetch = FetchType.LAZY)
     private RefreshToken refreshToken;
+
+    @OneToOne()
+    @JoinColumn(name = "file_id")
+    private FileInfo fileInfo;
 
     public User() {
     }

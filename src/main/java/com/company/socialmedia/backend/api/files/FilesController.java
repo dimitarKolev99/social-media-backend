@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/api")
-@CrossOrigin("http://localhost:8081")
+@CrossOrigin("http://localhost:9090")
 public class FilesController {
 
     @Autowired

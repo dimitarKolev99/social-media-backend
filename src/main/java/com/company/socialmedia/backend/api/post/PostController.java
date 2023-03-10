@@ -1,5 +1,9 @@
 package com.company.socialmedia.backend.api.post;
 
+import com.company.socialmedia.backend.api.files.FileInfo;
+import com.company.socialmedia.backend.api.files.FileInfoRepository;
+import com.company.socialmedia.backend.api.files.FilesStorageService;
+import com.company.socialmedia.backend.api.files.ResponseMessage;
 import com.company.socialmedia.backend.exception.ResourceNotFoundException;
 import com.company.socialmedia.backend.api.post.dto.Post;
 import com.company.socialmedia.backend.api.post.dto.request.PostRequest;
@@ -10,10 +14,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
 import java.util.*;
 
 @CrossOrigin(origins = "http://localhost:9000", maxAge = 3600)
@@ -33,6 +40,12 @@ public class PostController {
 
     @Autowired
     PostRepository postRepository;
+
+    @Autowired
+    FilesStorageService storageService;
+
+    @Autowired
+    FileInfoRepository fileInfoRepository;
 
     @GetMapping("/posts")
     @PreAuthorize("hasRole('USER') or hasRole('MODERATOR') or hasRole('ADMIN')")
@@ -78,9 +91,11 @@ public class PostController {
         return new ResponseEntity<>(postReturn, HttpStatus.CREATED);
     }
 
-    @PostMapping("/posts")
+    @PostMapping(value = "/posts", consumes = { MediaType.APPLICATION_JSON_VALUE,
+                MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('USER') or hasRole('MODERATOR') or hasRole('ADMIN')")
-    public ResponseEntity<Post> addPostOnCurrentUser(@RequestBody PostRequest postRequest) {
+    public ResponseEntity<ResponseMessage> addPostOnCurrentUser(@RequestParam(value = "file", required = false) MultipartFile file,
+                                                     @RequestPart("post") PostRequest postRequest) {
 
         UserContext userContext = UserContext.getCurrentUser();
 
@@ -93,8 +108,86 @@ public class PostController {
             return postRepository.save(post);
         }).orElseThrow(() -> new ResourceNotFoundException("Not found Tutorial with id = " + userId));
 
-        return new ResponseEntity<>(postReturn, HttpStatus.CREATED);
+        String message;
+
+        if (file != null) {
+
+            try {
+                Path filePath = storageService.save(file);
+
+                FileInfo fileInfo = new FileInfo();
+                fileInfo.setUri(filePath.toUri().toString());
+
+                postReturn.setFileInfo(fileInfo);
+
+                fileInfoRepository.save(fileInfo);
+
+                message = "Post created: " + file.getOriginalFilename();
+
+                return new ResponseEntity<>(new ResponseMessage(message), HttpStatus.CREATED);
+
+            } catch (Exception e) {
+                message = "Could not upload the file: " + file.getOriginalFilename() + ". Error: " + e.getMessage();
+                return new ResponseEntity<>(new ResponseMessage(message), HttpStatus.EXPECTATION_FAILED);
+            }
+        }
+
+        return new ResponseEntity<>(new ResponseMessage("Post Created"), HttpStatus.CREATED);
     }
+
+    @GetMapping(value = "/user/picture")
+    @PreAuthorize("hasRole('USER') or hasRole('MODERATOR') or hasRole('ADMIN')")
+    public ResponseEntity<?> getProfilePicture() {
+        UserContext userContext = UserContext.getCurrentUser();
+
+        Long userId = userContext.getId();
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Not found User with id = " + userId));
+
+        if (user.getFileInfo().getUri() != null) {
+            return new ResponseEntity<>(user.getFileInfo().getUri(), HttpStatus.OK);
+        }
+
+        return new ResponseEntity<>(new ResponseMessage("No user pic uploaded"), HttpStatus.EXPECTATION_FAILED);
+    }
+
+
+    @PostMapping(value = "/user/picture", consumes = {
+            MediaType.MULTIPART_FORM_DATA_VALUE })
+    @PreAuthorize("hasRole('USER') or hasRole('MODERATOR') or hasRole('ADMIN')")
+    public ResponseEntity<?> uploadProfilePic(@RequestParam(value = "file") MultipartFile file) {
+        UserContext userContext = UserContext.getCurrentUser();
+
+        Long userId = userContext.getId();
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Not found User with id = " + userId));
+
+        String message;
+
+        Path filePath = null;
+
+        try {
+            filePath = storageService.save(file);
+
+            FileInfo fileInfo = new FileInfo();
+            fileInfo.setUri(filePath.toUri().toString());
+
+            user.setFileInfo(fileInfo);
+
+            fileInfoRepository.save(fileInfo);
+
+            message = "User pic uploaded: " + file.getOriginalFilename();
+
+            return new ResponseEntity<>(new ResponseMessage(message), HttpStatus.CREATED);
+
+        } catch (Exception e) {
+            message = "Could not upload the user pic: " + file.getOriginalFilename() + ". Error: " + e.getMessage();
+            return new ResponseEntity<>(new ResponseMessage(filePath.toString()), HttpStatus.EXPECTATION_FAILED);
+        }
+    }
+
 
     @PutMapping("/posts/{id}")
     public ResponseEntity<Post> updatePost(@PathVariable("id") Long id, @RequestBody PostRequest postRequest) {
