@@ -4,6 +4,7 @@ import com.company.socialmedia.backend.api.files.FileInfo;
 import com.company.socialmedia.backend.api.files.FileInfoRepository;
 import com.company.socialmedia.backend.api.files.FilesStorageService;
 import com.company.socialmedia.backend.api.files.ResponseMessage;
+import com.company.socialmedia.backend.api.post.dto.request.UpdatePostLikesRequest;
 import com.company.socialmedia.backend.exception.ResourceNotFoundException;
 import com.company.socialmedia.backend.api.post.dto.Post;
 import com.company.socialmedia.backend.api.post.dto.request.PostRequest;
@@ -29,8 +30,6 @@ import java.util.*;
 public class PostController {
 
     public static final Logger LOGGER = LoggerFactory.getLogger(PostService.class);
-
-    private  static  final Random RANDOM = new Random();
 
     @Autowired
     PostService postService;
@@ -94,7 +93,7 @@ public class PostController {
     @PostMapping(value = "/posts", consumes = { MediaType.APPLICATION_JSON_VALUE,
                 MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('USER') or hasRole('MODERATOR') or hasRole('ADMIN')")
-    public ResponseEntity<ResponseMessage> addPostOnCurrentUser(@RequestParam(value = "file", required = false) MultipartFile file,
+    public ResponseEntity<Post> addPostOnCurrentUser(@RequestParam(value = "file", required = false) MultipartFile file,
                                                      @RequestPart("post") PostRequest postRequest) {
 
         UserContext userContext = UserContext.getCurrentUser();
@@ -106,7 +105,7 @@ public class PostController {
             post.setDescription(postRequest.getDescription());
             post.setUser(user);
             return postRepository.save(post);
-        }).orElseThrow(() -> new ResourceNotFoundException("Not found Tutorial with id = " + userId));
+        }).orElseThrow(() -> new ResourceNotFoundException("Not found Post with id = " + userId));
 
         String message;
 
@@ -124,15 +123,15 @@ public class PostController {
 
                 message = "Post created: " + file.getOriginalFilename();
 
-                return new ResponseEntity<>(new ResponseMessage(message), HttpStatus.CREATED);
+                return new ResponseEntity<>(postReturn, HttpStatus.CREATED);
 
             } catch (Exception e) {
                 message = "Could not upload the file: " + file.getOriginalFilename() + ". Error: " + e.getMessage();
-                return new ResponseEntity<>(new ResponseMessage(message), HttpStatus.EXPECTATION_FAILED);
+                return new ResponseEntity<>(postReturn, HttpStatus.EXPECTATION_FAILED);
             }
         }
 
-        return new ResponseEntity<>(new ResponseMessage("Post Created"), HttpStatus.CREATED);
+        return new ResponseEntity<>(postReturn, HttpStatus.CREATED);
     }
 
     @GetMapping(value = "/user/picture")
@@ -145,7 +144,7 @@ public class PostController {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Not found User with id = " + userId));
 
-        if (user.getFileInfo().getUri() != null) {
+        if (user.getFileInfo() != null && user.getFileInfo().getUri() != null) {
             return new ResponseEntity<>(user.getFileInfo().getUri(), HttpStatus.OK);
         }
 
@@ -183,7 +182,6 @@ public class PostController {
             return new ResponseEntity<>(new ResponseMessage(message), HttpStatus.CREATED);
 
         } catch (Exception e) {
-            message = "Could not upload the user pic: " + file.getOriginalFilename() + ". Error: " + e.getMessage();
             return new ResponseEntity<>(new ResponseMessage(filePath.toString()), HttpStatus.EXPECTATION_FAILED);
         }
     }
@@ -195,6 +193,16 @@ public class PostController {
                 .orElseThrow(() -> new ResourceNotFoundException("CommentId " + id + "not found"));
 
         postEntity.setDescription(postRequest.getDescription());
+
+        return new ResponseEntity<>(postRepository.save(postEntity), HttpStatus.OK);
+    }
+
+    @PutMapping("/posts/{id}/likes")
+    public ResponseEntity<Post> updatePostLikes(@PathVariable("id") Long id, @RequestBody UpdatePostLikesRequest updatePostLikesRequest) {
+        Post postEntity = postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CommentId " + id + "not found"));
+
+        postEntity.setLikeCount(updatePostLikesRequest.getNumberLikes());
 
         return new ResponseEntity<>(postRepository.save(postEntity), HttpStatus.OK);
     }
