@@ -11,6 +11,11 @@ import com.company.socialmedia.backend.api.post.dto.request.PostRequest;
 import com.company.socialmedia.backend.api.user.UserRepository;
 import com.company.socialmedia.backend.api.user.dto.User;
 import com.company.socialmedia.backend.security.UserContext;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Encoding;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,16 +95,16 @@ public class PostController {
         return new ResponseEntity<>(postReturn, HttpStatus.CREATED);
     }
 
-    @PostMapping(value = "/posts", consumes = { MediaType.APPLICATION_JSON_VALUE,
+    @PostMapping(value = "/posts", consumes = {
                 MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('USER') or hasRole('MODERATOR') or hasRole('ADMIN')")
-    public ResponseEntity<Post> addPostOnCurrentUser(@RequestParam(value = "file", required = false) MultipartFile file,
-                                                     @RequestPart("post") PostRequest postRequest) {
+    public ResponseEntity<Post> addPostOnCurrentUser(@ModelAttribute PostRequest postRequest) {
 
         UserContext userContext = UserContext.getCurrentUser();
 
         Long userId = userContext.getId();
 
+        LOGGER.debug("POST REQUEST PART {}", postRequest.getDescription());
         Post postReturn = userRepository.findById(userId).map(user -> {
             Post post = new Post();
             post.setDescription(postRequest.getDescription());
@@ -109,10 +114,10 @@ public class PostController {
 
         String message;
 
-        if (file != null) {
+        if (postRequest.getFile() != null) {
 
             try {
-                Path filePath = storageService.save(file);
+                Path filePath = storageService.save(postRequest.getFile());
 
                 FileInfo fileInfo = new FileInfo();
                 fileInfo.setUri(filePath.toUri().toString());
@@ -121,12 +126,12 @@ public class PostController {
 
                 fileInfoRepository.save(fileInfo);
 
-                message = "Post created: " + file.getOriginalFilename();
+                message = "Post created: " + postRequest.getFile().getOriginalFilename();
 
                 return new ResponseEntity<>(postReturn, HttpStatus.CREATED);
 
             } catch (Exception e) {
-                message = "Could not upload the file: " + file.getOriginalFilename() + ". Error: " + e.getMessage();
+                message = "Could not upload the file: " + postRequest.getFile().getOriginalFilename() + ". Error: " + e.getMessage();
                 return new ResponseEntity<>(postReturn, HttpStatus.EXPECTATION_FAILED);
             }
         }
@@ -198,10 +203,12 @@ public class PostController {
     }
 
     @PutMapping("/posts/{id}/likes")
-    public ResponseEntity<Post> updatePostLikes(@PathVariable("id") Long id, @RequestBody UpdatePostLikesRequest updatePostLikesRequest) {
+    public ResponseEntity<Post> setNewPostLikes(@PathVariable("id") Long id, @RequestBody UpdatePostLikesRequest updatePostLikesRequest) {
         Post postEntity = postRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("CommentId " + id + "not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Post " + id + "not found"));
 
+        LOGGER.debug("CALLED");
+        LOGGER.debug("REQUEST LIKES COUNT: {}", updatePostLikesRequest.getNumberLikes());
         postEntity.setLikeCount(updatePostLikesRequest.getNumberLikes());
 
         return new ResponseEntity<>(postRepository.save(postEntity), HttpStatus.OK);

@@ -6,12 +6,5 @@ public @Data class UpdatePostLikesRequest {
 
     private Integer numberLikes;
 
-    public UpdatePostLikesRequest() {
-
-    }
-
-    public UpdatePostLikesRequest(Integer numberLikes) {
-        this.numberLikes = numberLikes;
-    }
 
 }
